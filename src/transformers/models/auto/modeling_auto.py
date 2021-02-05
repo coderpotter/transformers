@@ -21,12 +21,6 @@ from collections import OrderedDict
 from ...configuration_utils import PretrainedConfig
 from ...file_utils import add_start_docstrings
 from ...utils import logging
-
-# Add modeling imports here
-from ..detr.modeling_detr import (
-    DetrForObjectDetection,
-    DetrModel,
-)
 from ..albert.modeling_albert import (
     AlbertForMaskedLM,
     AlbertForMultipleChoice,
@@ -70,12 +64,6 @@ from ..camembert.modeling_camembert import (
     CamembertForTokenClassification,
     CamembertModel,
 )
-
-# Add modeling imports here
-from ..detr.modeling_detr import (
-    DetrForObjectDetection,
-    DetrModel,
-)
 from ..convbert.modeling_convbert import (
     ConvBertForMaskedLM,
     ConvBertForMultipleChoice,
@@ -92,6 +80,10 @@ from ..deberta.modeling_deberta import (
     DebertaForTokenClassification,
     DebertaModel,
 )
+
+# Add modeling imports here
+# Add modeling imports here
+from ..detr.modeling_detr import DetrForObjectDetection, DetrModel
 from ..distilbert.modeling_distilbert import (
     DistilBertForMaskedLM,
     DistilBertForMultipleChoice,
@@ -251,7 +243,6 @@ from ..xlnet.modeling_xlnet import (
     XLNetModel,
 )
 from .configuration_auto import (
-    DetrConfig,
     AlbertConfig,
     AutoConfig,
     BartConfig,
@@ -263,6 +254,7 @@ from .configuration_auto import (
     ConvBertConfig,
     CTRLConfig,
     DebertaConfig,
+    DetrConfig,
     DistilBertConfig,
     DPRConfig,
     ElectraConfig,
@@ -386,7 +378,6 @@ MODEL_FOR_PRETRAINING_MAPPING = OrderedDict(
 MODEL_WITH_LM_HEAD_MAPPING = OrderedDict(
     [
         # Model with LM heads mapping
-
         (Wav2Vec2Config, Wav2Vec2ForMaskedLM),
         (ConvBertConfig, ConvBertForMaskedLM),
         (LEDConfig, LEDForConditionalGeneration),
@@ -482,7 +473,6 @@ MODEL_FOR_MASKED_LM_MAPPING = OrderedDict(
 MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
     [
         # Model for Seq2Seq Causal LM mapping
-
         (LEDConfig, LEDForConditionalGeneration),
         (BlenderbotSmallConfig, BlenderbotSmallForConditionalGeneration),
         (MT5Config, MT5ForConditionalGeneration),
@@ -632,9 +622,11 @@ AUTO_MODEL_PRETRAINED_DOCSTRING = r"""
         The model is set in evaluation mode by default using ``model.eval()`` (so for instance, dropout modules are
         deactivated). To train the model, you should first set it back in training mode with ``model.train()``
 
+
         Args:
             pretrained_model_name_or_path (:obj:`str` or :obj:`os.PathLike`):
                 Can be either:
+
 
                     - A string, the `model id` of a pretrained model hosted inside a model repo on huggingface.co.
                       Valid model ids can be located at the root-level, like ``bert-base-uncased``, or namespaced under
@@ -650,6 +642,7 @@ AUTO_MODEL_PRETRAINED_DOCSTRING = r"""
             config (:class:`~transformers.PretrainedConfig`, `optional`):
                 Configuration for the model to use instead of an automatically loaded configuration. Configuration can
                 be automatically loaded when:
+
 
                     - The model is a model provided by the library (loaded with the `model id` string of a pretrained
                       model).
@@ -692,6 +685,7 @@ AUTO_MODEL_PRETRAINED_DOCSTRING = r"""
                 :obj:`output_attentions=True`). Behaves differently depending on whether a ``config`` is provided or
                 automatically loaded:
 
+
                     - If a configuration is provided with ``config``, ``**kwargs`` will be directly passed to the
                       underlying model's ``__init__`` method (we assume all relevant updates to the configuration have
                       already been done)
@@ -729,11 +723,13 @@ class AutoModel:
             Loading a model from its configuration file does **not** load the model weights. It only affects the
             model's configuration. Use :meth:`~transformers.AutoModel.from_pretrained` to load the model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -759,6 +755,7 @@ class AutoModel:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
 
         Examples::
 
@@ -823,11 +820,13 @@ class AutoModelForPreTraining:
             model's configuration. Use :meth:`~transformers.AutoModelForPreTraining.from_pretrained` to load the model
             weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -854,6 +853,7 @@ class AutoModelForPreTraining:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForPreTraining
@@ -922,11 +922,13 @@ class AutoModelWithLMHead:
             model's configuration. Use :meth:`~transformers.AutoModelWithLMHead.from_pretrained` to load the model
             weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -959,6 +961,7 @@ class AutoModelWithLMHead:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelWithLMHead
@@ -1027,11 +1030,13 @@ class AutoModelForCausalLM:
             model's configuration. Use :meth:`~transformers.AutoModelForCausalLM.from_pretrained` to load the model
             weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1058,6 +1063,7 @@ class AutoModelForCausalLM:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForCausalLM
@@ -1120,11 +1126,13 @@ class AutoModelForMaskedLM:
             model's configuration. Use :meth:`~transformers.AutoModelForMaskedLM.from_pretrained` to load the model
             weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1151,6 +1159,7 @@ class AutoModelForMaskedLM:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForMaskedLM
@@ -1214,11 +1223,13 @@ class AutoModelForSeq2SeqLM:
             model's configuration. Use :meth:`~transformers.AutoModelForSeq2SeqLM.from_pretrained` to load the model
             weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1247,6 +1258,7 @@ class AutoModelForSeq2SeqLM:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForSeq2SeqLM
@@ -1312,11 +1324,13 @@ class AutoModelForSequenceClassification:
             model's configuration. Use :meth:`~transformers.AutoModelForSequenceClassification.from_pretrained` to load
             the model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1345,6 +1359,7 @@ class AutoModelForSequenceClassification:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForSequenceClassification
@@ -1408,11 +1423,13 @@ class AutoModelForQuestionAnswering:
             model's configuration. Use :meth:`~transformers.AutoModelForQuestionAnswering.from_pretrained` to load the
             model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1442,6 +1459,7 @@ class AutoModelForQuestionAnswering:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForQuestionAnswering
@@ -1508,11 +1526,13 @@ class AutoModelForTableQuestionAnswering:
             model's configuration. Use :meth:`~transformers.AutoModelForTableQuestionAnswering.from_pretrained` to load
             the model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1542,6 +1562,7 @@ class AutoModelForTableQuestionAnswering:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForTableQuestionAnswering
@@ -1606,11 +1627,13 @@ class AutoModelForTokenClassification:
             model's configuration. Use :meth:`~transformers.AutoModelForTokenClassification.from_pretrained` to load
             the model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1640,6 +1663,7 @@ class AutoModelForTokenClassification:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForTokenClassification
@@ -1706,11 +1730,13 @@ class AutoModelForMultipleChoice:
             model's configuration. Use :meth:`~transformers.AutoModelForMultipleChoice.from_pretrained` to load the
             model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1740,6 +1766,7 @@ class AutoModelForMultipleChoice:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForMultipleChoice
@@ -1806,11 +1833,13 @@ class AutoModelForNextSentencePrediction:
             model's configuration. Use :meth:`~transformers.AutoModelForNextSentencePrediction.from_pretrained` to load
             the model weights.
 
+
         Args:
             config (:class:`~transformers.PretrainedConfig`):
                 The model class to instantiate is selected based on the configuration class:
 
                 List options
+
 
         Examples::
 
@@ -1840,6 +1869,7 @@ class AutoModelForNextSentencePrediction:
     )
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         r"""
+
         Examples::
 
             >>> from transformers import AutoConfig, AutoModelForNextSentencePrediction
