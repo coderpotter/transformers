@@ -92,13 +92,15 @@ def train(args, train_dataset, model, tokenizer, train_highway=False):
                 "params": [
                     p
                     for n, p in model.named_parameters()
-                    if ("highway" in n) and (not any(nd in n for nd in no_decay))
+                    if "highway" in n and all(nd not in n for nd in no_decay)
                 ],
                 "weight_decay": args.weight_decay,
             },
             {
                 "params": [
-                    p for n, p in model.named_parameters() if ("highway" in n) and (any(nd in n for nd in no_decay))
+                    p
+                    for n, p in model.named_parameters()
+                    if ("highway" in n) and (any(nd in n for nd in no_decay))
                 ],
                 "weight_decay": 0.0,
             },
@@ -109,7 +111,8 @@ def train(args, train_dataset, model, tokenizer, train_highway=False):
                 "params": [
                     p
                     for n, p in model.named_parameters()
-                    if ("highway" not in n) and (not any(nd in n for nd in no_decay))
+                    if "highway" not in n
+                    and all(nd not in n for nd in no_decay)
                 ],
                 "weight_decay": args.weight_decay,
             },
@@ -117,7 +120,8 @@ def train(args, train_dataset, model, tokenizer, train_highway=False):
                 "params": [
                     p
                     for n, p in model.named_parameters()
-                    if ("highway" not in n) and (any(nd in n for nd in no_decay))
+                    if ("highway" not in n)
+                    and (any(nd in n for nd in no_decay))
                 ],
                 "weight_decay": 0.0,
             },
@@ -206,14 +210,14 @@ def train(args, train_dataset, model, tokenizer, train_highway=False):
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results = evaluate(args, model, tokenizer)
                         for key, value in results.items():
-                            tb_writer.add_scalar("eval_{}".format(key), value, global_step)
+                            tb_writer.add_scalar(f"eval_{key}", value, global_step)
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logging_loss = tr_loss
 
                 if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
-                    output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
+                    output_dir = os.path.join(args.output_dir, f"checkpoint-{global_step}")
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     model_to_save = (
@@ -239,9 +243,12 @@ def train(args, train_dataset, model, tokenizer, train_highway=False):
 def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=False):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_task_names = ("mnli", "mnli-mm") if args.task_name == "mnli" else (args.task_name,)
-    eval_outputs_dirs = (args.output_dir, args.output_dir + "-MM") if args.task_name == "mnli" else (args.output_dir,)
-
     results = {}
+    eval_outputs_dirs = (
+        (args.output_dir, f"{args.output_dir}-MM")
+        if args.task_name == "mnli"
+        else (args.output_dir,)
+    )
     for eval_task, eval_output_dir in zip(eval_task_names, eval_outputs_dirs):
         eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, evaluate=True)
 
@@ -258,7 +265,7 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
             model = torch.nn.DataParallel(model)
 
         # Eval!
-        logger.info("***** Running evaluation {} *****".format(prefix))
+        logger.info(f"***** Running evaluation {prefix} *****")
         logger.info("  Num examples = %d", len(eval_dataset))
         logger.info("  Batch size = %d", args.eval_batch_size)
         eval_loss = 0.0
@@ -293,7 +300,7 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
                 preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
                 out_label_ids = np.append(out_label_ids, inputs["labels"].detach().cpu().numpy(), axis=0)
         eval_time = time.time() - st
-        logger.info("Eval time: {}".format(eval_time))
+        logger.info(f"Eval time: {eval_time}")
 
         eval_loss = eval_loss / nb_eval_steps
         if args.output_mode == "classification":
@@ -301,19 +308,17 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
         elif args.output_mode == "regression":
             preds = np.squeeze(preds)
         result = compute_metrics(eval_task, preds, out_label_ids)
-        results.update(result)
+        results |= result
 
         if eval_highway:
-            logger.info("Exit layer counter: {}".format(exit_layer_counter))
-            actual_cost = sum([l * c for l, c in exit_layer_counter.items()])
+            logger.info(f"Exit layer counter: {exit_layer_counter}")
+            actual_cost = sum(l * c for l, c in exit_layer_counter.items())
             full_cost = len(eval_dataloader) * model.num_layers
-            logger.info("Expected saving: {}".format(actual_cost / full_cost))
+            logger.info(f"Expected saving: {actual_cost / full_cost}")
             if args.early_exit_entropy >= 0:
                 save_fname = (
-                    args.plot_data_dir
-                    + "/"
-                    + args.model_name_or_path[2:]
-                    + "/entropy_{}.npy".format(args.early_exit_entropy)
+                    f"{args.plot_data_dir}/{args.model_name_or_path[2:]}"
+                    + f"/entropy_{args.early_exit_entropy}.npy"
                 )
                 if not os.path.exists(os.path.dirname(save_fname)):
                     os.makedirs(os.path.dirname(save_fname))
@@ -323,7 +328,7 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
 
         output_eval_file = os.path.join(eval_output_dir, prefix, "eval_results.txt")
         with open(output_eval_file, "w") as writer:
-            logger.info("***** Eval results {} *****".format(prefix))
+            logger.info(f"***** Eval results {prefix} *****")
             for key in sorted(result.keys()):
                 logger.info("  %s = %s", key, str(result[key]))
                 writer.write("%s = %s\n" % (key, str(result[key])))
@@ -340,12 +345,7 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
     # Load data features from cache or dataset file
     cached_features_file = os.path.join(
         args.data_dir,
-        "cached_{}_{}_{}_{}".format(
-            "dev" if evaluate else "train",
-            list(filter(None, args.model_name_or_path.split("/"))).pop(),
-            str(args.max_seq_length),
-            str(task),
-        ),
+        f'cached_{"dev" if evaluate else "train"}_{list(filter(None, args.model_name_or_path.split("/"))).pop()}_{str(args.max_seq_length)}_{str(task)}',
     )
     if os.path.exists(cached_features_file) and not args.overwrite_cache:
         logger.info("Loading features from cached file %s", cached_features_file)
@@ -379,7 +379,9 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
 
     if features[0].token_type_ids is None:
         # For RoBERTa (a potential bug!)
-        all_token_type_ids = torch.tensor([[0] * args.max_seq_length for f in features], dtype=torch.long)
+        all_token_type_ids = torch.tensor(
+            [[0] * args.max_seq_length for _ in features], dtype=torch.long
+        )
     else:
         all_token_type_ids = torch.tensor([f.token_type_ids for f in features], dtype=torch.long)
     if output_mode == "classification":
@@ -387,8 +389,9 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
     elif output_mode == "regression":
         all_labels = torch.tensor([f.label for f in features], dtype=torch.float)
 
-    dataset = TensorDataset(all_input_ids, all_attention_mask, all_token_type_ids, all_labels)
-    return dataset
+    return TensorDataset(
+        all_input_ids, all_attention_mask, all_token_type_ids, all_labels
+    )
 
 
 def main():

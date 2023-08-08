@@ -94,12 +94,10 @@ def process_story(raw_story):
 
 
 def _add_missing_period(line):
-    END_TOKENS = [".", "!", "?", "...", "'", "`", '"', "\u2019", "\u2019", ")"]
     if line.startswith("@highlight"):
         return line
-    if line[-1] in END_TOKENS:
-        return line
-    return line + "."
+    END_TOKENS = [".", "!", "?", "...", "'", "`", '"', "\u2019", "\u2019", ")"]
+    return line if line[-1] in END_TOKENS else f"{line}."
 
 
 # --------------------------
@@ -113,9 +111,8 @@ def truncate_or_pad(sequence, block_size, pad_token_id):
     """
     if len(sequence) > block_size:
         return sequence[:block_size]
-    else:
-        sequence.extend([pad_token_id] * (block_size - len(sequence)))
-        return sequence
+    sequence.extend([pad_token_id] * (block_size - len(sequence)))
+    return sequence
 
 
 def build_mask(sequence, pad_token_id):

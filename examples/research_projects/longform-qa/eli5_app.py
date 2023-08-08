@@ -81,29 +81,27 @@ eli5_train, eli5_train_q_index = load_train_data()
 def find_nearest_training(question, n_results=10):
     q_rep = embed_questions_for_retrieval([question], qar_tokenizer, qar_model)
     D, I = eli5_train_q_index.search(q_rep, n_results)
-    nn_examples = [eli5_train[int(i)] for i in I[0]]
-    return nn_examples
+    return [eli5_train[int(i)] for i in I[0]]
 
 
 def make_support(question, source="wiki40b", method="dense", n_results=10):
     if source == "none":
         support_doc, hit_lst = (" <P> ".join(["" for _ in range(11)]).strip(), [])
+    elif method == "dense":
+        support_doc, hit_lst = query_qa_dense_index(
+            question, qar_model, qar_tokenizer, passages, gpu_dense_index, n_results
+        )
     else:
-        if method == "dense":
-            support_doc, hit_lst = query_qa_dense_index(
-                question, qar_model, qar_tokenizer, passages, gpu_dense_index, n_results
-            )
-        else:
-            support_doc, hit_lst = query_es_index(
-                question,
-                es_client,
-                index_name="english_wiki40b_snippets_100w",
-                n_results=n_results,
-            )
+        support_doc, hit_lst = query_es_index(
+            question,
+            es_client,
+            index_name="english_wiki40b_snippets_100w",
+            n_results=n_results,
+        )
     support_list = [
         (res["article_title"], res["section_title"].strip(), res["score"], res["passage_text"]) for res in hit_lst
     ]
-    question_doc = "question: {} context: {}".format(question, support_doc)
+    question_doc = f"question: {question} context: {support_doc}"
     return question_doc, support_list
 
 

@@ -15,6 +15,7 @@
 """
 Preprocessing script before training the distilled model.
 """
+
 import argparse
 import logging
 import pickle
@@ -46,7 +47,7 @@ if __name__ == "__main__":
     logger.info("Counting occurences for MLM.")
     counter = Counter()
     for tk_ids in data:
-        counter.update(tk_ids)
+        counter |= tk_ids
     counts = [0] * args.vocab_size
     for k, v in counter.items():
         counts[k] = v
