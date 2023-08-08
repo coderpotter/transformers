@@ -62,18 +62,23 @@ def pad_list_tensors(
     assert padding in {"max_detections", "max_batch", None}
     new = []
     if padding is None:
-        if return_tensors is None:
-            return list_tensors
-        elif return_tensors == "pt":
-            if not isinstance(list_tensors, torch.Tensor):
-                return torch.stack(list_tensors).to(location)
-            else:
-                return list_tensors.to(location)
+        if (
+            return_tensors is not None
+            and return_tensors == "pt"
+            and not isinstance(list_tensors, torch.Tensor)
+        ):
+            return torch.stack(list_tensors).to(location)
+        elif (
+            return_tensors is not None
+            and return_tensors == "pt"
+            or return_tensors is not None
+            and isinstance(list_tensors, list)
+        ):
+            return list_tensors.to(location)
+        elif return_tensors is not None:
+            return np.array(list_tensors.to(location))
         else:
-            if not isinstance(list_tensors, list):
-                return np.array(list_tensors.to(location))
-            else:
-                return list_tensors.to(location)
+            return list_tensors
     if padding == "max_detections":
         assert max_detections is not None, "specify max number of detections per batch"
     elif padding == "max_batch":
@@ -97,13 +102,10 @@ def pad_list_tensors(
             if location == "cpu":
                 tensor_i = tensor_i.cpu()
             tensor_i = tensor_i.tolist()
+        if location == "cpu":
+            tensor_i = tensor_i.cpu()
         if return_tensors == "np":
-            if location == "cpu":
-                tensor_i = tensor_i.cpu()
             tensor_i = tensor_i.numpy()
-        else:
-            if location == "cpu":
-                tensor_i = tensor_i.cpu()
         new.append(tensor_i)
     if return_tensors == "np":
         return np.stack(new, axis=0)
@@ -131,12 +133,10 @@ def do_nms(boxes, scores, image_shape, score_thresh, nms_thresh, mind, maxd):
     # Apply NMS
     keep = nms(max_boxes, max_scores, nms_thresh)
     keep = keep[:maxd]
-    if keep.shape[-1] >= mind and keep.shape[-1] <= maxd:
-        max_boxes, max_scores = max_boxes[keep], max_scores[keep]
-        classes = max_classes[keep]
-        return max_boxes, max_scores, classes, keep
-    else:
+    if keep.shape[-1] < mind or keep.shape[-1] > maxd:
         return None
+    max_boxes, max_scores = max_boxes[keep], max_scores[keep]
+    return max_boxes, max_scores, max_classes[keep], keep
 
 
 # Helper Functions
@@ -152,8 +152,7 @@ def _clip_box(tensor, box_size: Tuple[int, int]):
 def _nonempty_boxes(box, threshold: float = 0.0) -> torch.Tensor:
     widths = box[:, 2] - box[:, 0]
     heights = box[:, 3] - box[:, 1]
-    keep = (widths > threshold) & (heights > threshold)
-    return keep
+    return (widths > threshold) & (heights > threshold)
 
 
 def get_norm(norm, out_channels):
@@ -217,7 +216,7 @@ def build_backbone(cfg):
     out_channels = cfg.RESNETS.RES2_OUT_CHANNELS
     stride_in_1x1 = cfg.RESNETS.STRIDE_IN_1X1
     res5_dilation = cfg.RESNETS.RES5_DILATION
-    assert res5_dilation in {1, 2}, "res5_dilation cannot be {}.".format(res5_dilation)
+    assert res5_dilation in {1, 2}, f"res5_dilation cannot be {res5_dilation}."
 
     num_blocks_per_stage = {50: [3, 4, 6, 3], 101: [3, 4, 23, 3], 152: [3, 8, 36, 3]}[depth]
 
@@ -237,9 +236,9 @@ def build_backbone(cfg):
             "norm": norm,
             "stride_in_1x1": stride_in_1x1,
             "dilation": dilation,
+            "block_class": BottleneckBlock,
         }
 
-        stage_kargs["block_class"] = BottleneckBlock
         blocks = ResNet.make_stage(**stage_kargs)
         in_channels = out_channels
         out_channels *= 2
@@ -377,11 +376,10 @@ def _fmt_box_list(box_tensor, batch_index: int):
 
 
 def convert_boxes_to_pooler_format(box_lists: List[torch.Tensor]):
-    pooler_fmt_boxes = torch.cat(
+    return torch.cat(
         [_fmt_box_list(box_list, i) for i, box_list in enumerate(box_lists)],
         dim=0,
     )
-    return pooler_fmt_boxes
 
 
 def assign_boxes_to_levels(
@@ -557,8 +555,8 @@ class Matcher(object):
         assert thresholds[0] > 0
         thresholds.insert(0, -float("inf"))
         thresholds.append(float("inf"))
-        assert all([low <= high for (low, high) in zip(thresholds[:-1], thresholds[1:])])
-        assert all([label_i in [-1, 0, 1] for label_i in labels])
+        assert all(low <= high for (low, high) in zip(thresholds[:-1], thresholds[1:]))
+        assert all(label_i in [-1, 0, 1] for label_i in labels)
         assert len(labels) == len(thresholds) - 1
         self.thresholds = thresholds
         self.labels = labels
@@ -684,20 +682,18 @@ class RPNOutputs(object):
             proposals_i = self.box2box_transform.apply_deltas(pred_anchor_deltas_i, anchors_i)
             # Append feature map proposals with shape (N, Hi*Wi*A, B)
             proposals.append(proposals_i.view(N, -1, B))
-        proposals = torch.stack(proposals)
-        return proposals
+        return torch.stack(proposals)
 
     def predict_objectness_logits(self):
         """
         Returns:
             pred_objectness_logits (list[Tensor]) -> (N, Hi*Wi*A).
         """
-        pred_objectness_logits = [
+        return [
             # Reshape: (N, A, Hi, Wi) -> (N, Hi, Wi, A) -> (N, Hi*Wi*A)
             score.permute(0, 2, 3, 1).reshape(self.num_images, -1)
             for score in self.pred_objectness_logits
         ]
-        return pred_objectness_logits
 
 
 # Main Classes
@@ -727,12 +723,11 @@ class Conv2d(torch.nn.Conv2d):
             ]
             output_shape = [x.shape[0], self.weight.shape[0]] + output_shape
             empty = _NewEmptyTensorOp.apply(x, output_shape)
-            if self.training:
-                _dummy = sum(x.view(-1)[0] for x in self.parameters()) * 0.0
-                return empty + _dummy
-            else:
+            if not self.training:
                 return empty
 
+            _dummy = sum(x.view(-1)[0] for x in self.parameters()) * 0.0
+            return empty + _dummy
         x = super().forward(x)
         if self.norm is not None:
             x = self.norm(x)
@@ -888,11 +883,7 @@ class BottleneckBlock(ResNetBlockBase):
 
         out = self.conv3(out)
 
-        if self.shortcut is not None:
-            shortcut = self.shortcut(x)
-        else:
-            shortcut = x
-
+        shortcut = self.shortcut(x) if self.shortcut is not None else x
         out += shortcut
         out = F.relu_(out)
         return out
@@ -964,7 +955,7 @@ class ResNet(Backbone):
                 assert isinstance(block, ResNetBlockBase), block
                 curr_channels = block.out_channels
             stage = nn.Sequential(*blocks)
-            name = "res" + str(i + 2)
+            name = f"res{str(i + 2)}"
             self.add_module(name, stage)
             self.stages_and_names.append((stage, name))
             self._out_feature_strides[name] = current_stride = int(
@@ -988,7 +979,7 @@ class ResNet(Backbone):
         assert len(self._out_features)
         children = [x[0] for x in self.named_children()]
         for out_feature in self._out_features:
-            assert out_feature in children, "Available children: {}".format(", ".join(children))
+            assert out_feature in children, f'Available children: {", ".join(children)}'
 
     def forward(self, x):
         outputs = {}
@@ -1075,12 +1066,12 @@ class ROIPooler(nn.Module):
         # a bunch of testing
         assert math.isclose(min_level, int(min_level)) and math.isclose(max_level, int(max_level))
         assert len(scales) == max_level - min_level + 1, "not pyramid"
-        assert 0 < min_level and min_level <= max_level
+        assert 0 < min_level <= max_level
         if isinstance(output_size, int):
             output_size = (output_size, output_size)
         assert len(output_size) == 2 and isinstance(output_size[0], int) and isinstance(output_size[1], int)
         if len(scales) > 1:
-            assert min_level <= canonical_level and canonical_level <= max_level
+            assert min_level <= canonical_level <= max_level
         assert canonical_box_size > 0
 
         self.output_size = output_size
@@ -1098,7 +1089,7 @@ class ROIPooler(nn.Module):
         Returns:
             A tensor of shape(N*B, Channels, output_size, output_size)
         """
-        x = [v for v in feature_maps.values()]
+        x = list(feature_maps.values())
         num_level_assignments = len(self.level_poolers)
         assert len(x) == num_level_assignments and len(boxes) == x[0].size(0)
 
@@ -1384,9 +1375,10 @@ class AnchorGenerator(nn.Module):
         assert self.num_features == len(sizes)
         assert self.num_features == len(aspect_ratios)
 
-        cell_anchors = [self.generate_cell_anchors(s, a).float() for s, a in zip(sizes, aspect_ratios)]
-
-        return cell_anchors
+        return [
+            self.generate_cell_anchors(s, a).float()
+            for s, a in zip(sizes, aspect_ratios)
+        ]
 
     @property
     def box_dim(self):
@@ -1585,7 +1577,6 @@ class RPN(nn.Module):
 
         if self.training:
             raise NotImplementedError()
-            return self.training(outputs, images, image_shapes, features, gt_boxes)
         else:
             return self.inference(outputs, images, image_shapes, features, gt_boxes)
 

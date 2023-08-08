@@ -19,6 +19,7 @@ text file or a dataset.
 Here is the full list of checkpoints on the hub that can be fine-tuned by this script:
 https://huggingface.co/models?filter=masked-lm
 """
+
 import logging
 import os
 import sys
@@ -54,9 +55,7 @@ from transformers import (
 )
 
 
-# Cache the result
-has_tensorboard = is_tensorboard_available()
-if has_tensorboard:
+if has_tensorboard := is_tensorboard_available():
     try:
         from flax.metrics.tensorboard import SummaryWriter
     except ImportError as ie:
@@ -165,13 +164,12 @@ class DataTrainingArguments:
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
             raise ValueError("Need either a dataset name or a training/validation file.")
-        else:
-            if self.train_file is not None:
-                extension = self.train_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`train_file` should be a csv, a json or a txt file."
-            if self.validation_file is not None:
-                extension = self.validation_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
+        if self.train_file is not None:
+            extension = self.train_file.split(".")[-1]
+            assert extension in ["csv", "json", "txt"], "`train_file` should be a csv, a json or a txt file."
+        if self.validation_file is not None:
+            extension = self.validation_file.split(".")[-1]
+            assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
 
 
 # Adapted from transformers/data/data_collator.py
@@ -306,7 +304,7 @@ def create_learning_rate_scheduler(
                 progress = jnp.maximum(0.0, (step - warmup_steps) / float(steps_per_cycle))
                 ret *= jnp.maximum(0.0, 0.5 * (1.0 + jnp.cos(jnp.pi * (progress % 1.0))))
             else:
-                raise ValueError("Unknown factor %s." % name)
+                raise ValueError(f"Unknown factor {name}.")
         return jnp.asarray(ret, dtype=jnp.float32)
 
     return step_fn
@@ -332,7 +330,7 @@ def accuracy(logits, targets, weights=None):
     """
     if logits.ndim != targets.ndim + 1:
         raise ValueError(
-            "Incorrect shapes. Got shape %s logits and %s targets" % (str(logits.shape), str(targets.shape))
+            f"Incorrect shapes. Got shape {str(logits.shape)} logits and {str(targets.shape)} targets"
         )
 
     loss = jnp.equal(jnp.argmax(logits, axis=-1), targets)
@@ -353,7 +351,7 @@ def cross_entropy(logits, targets, weights=None, label_smoothing=0.0):
     """
     if logits.ndim != targets.ndim + 1:
         raise ValueError(
-            "Incorrect shapes. Got shape %s logits and %s targets" % (str(logits.shape), str(targets.shape))
+            f"Incorrect shapes. Got shape {str(logits.shape)} logits and {str(targets.shape)} targets"
         )
 
     vocab_size = logits.shape[-1]
@@ -419,8 +417,7 @@ def generate_batch_splits(samples_idx: jnp.ndarray, batch_size: int) -> jnp.ndar
     if samples_to_remove != 0:
         samples_idx = samples_idx[:-samples_to_remove]
     sections_split = nb_samples // batch_size
-    batch_idx = np.split(samples_idx, sections_split)
-    return batch_idx
+    return np.split(samples_idx, sections_split)
 
 
 if __name__ == "__main__":

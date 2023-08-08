@@ -51,7 +51,7 @@ class BertAbs(BertAbsPreTrainedModel):
         self.bert = Bert()
 
         # If pre-trained weights are passed for Bert, load these.
-        load_bert_pretrained_extractive = True if bert_extractive_checkpoint else False
+        load_bert_pretrained_extractive = bool(bert_extractive_checkpoint)
         if load_bert_pretrained_extractive:
             self.bert.model.load_state_dict(
                 dict([(n[11:], p) for n, p in bert_extractive_checkpoint.items() if n.startswith("bert.model")]),
@@ -85,7 +85,7 @@ class BertAbs(BertAbsPreTrainedModel):
         self.generator = nn.Sequential(nn.Linear(args.dec_hidden_size, args.vocab_size), gen_func)
         self.generator[0].weight = self.decoder.embeddings.weight
 
-        load_from_checkpoints = False if checkpoint is None else True
+        load_from_checkpoints = checkpoint is not None
         if load_from_checkpoints:
             self.load_state_dict(checkpoint)
 
@@ -232,7 +232,9 @@ class TransformerDecoder(nn.Module):
                 src_pad_mask,
                 tgt_pad_mask,
                 previous_input=prev_layer_input,
-                layer_cache=state.cache["layer_{}".format(i)] if state.cache is not None else None,
+                layer_cache=state.cache[f"layer_{i}"]
+                if state.cache is not None
+                else None,
                 step=step,
             )
             if state.cache is None:
@@ -572,7 +574,7 @@ class DecoderState(object):
 
     def detach(self):
         """ Need to document this """
-        self.hidden = tuple([_.detach() for _ in self.hidden])
+        self.hidden = tuple(_.detach() for _ in self.hidden)
         self.input_feed = self.input_feed.detach()
 
     def beam_update(self, idx, positions, beam_size):
@@ -632,10 +634,13 @@ class TransformerDecoderState(DecoderState):
         self.cache = {}
 
         for l in range(num_layers):
-            layer_cache = {"memory_keys": None, "memory_values": None}
-            layer_cache["self_keys"] = None
-            layer_cache["self_values"] = None
-            self.cache["layer_{}".format(l)] = layer_cache
+            layer_cache = {
+                "memory_keys": None,
+                "memory_values": None,
+                "self_keys": None,
+                "self_values": None,
+            }
+            self.cache[f"layer_{l}"] = layer_cache
 
     def repeat_beam_size_times(self, beam_size):
         """ Repeat beam_size times along batch dimension. """
@@ -694,8 +699,9 @@ class PositionwiseFeedForward(nn.Module):
 def build_predictor(args, tokenizer, symbols, model, logger=None):
     # we should be able to refactor the global scorer a lot
     scorer = GNMTGlobalScorer(args.alpha, length_penalty="wu")
-    translator = Translator(args, model, tokenizer, symbols, global_scorer=scorer, logger=logger)
-    return translator
+    return Translator(
+        args, model, tokenizer, symbols, global_scorer=scorer, logger=logger
+    )
 
 
 class GNMTGlobalScorer(object):
@@ -717,8 +723,7 @@ class GNMTGlobalScorer(object):
         """
         Rescores a prediction based on penalty functions
         """
-        normalized_probs = self.length_penalty(beam, logprobs, self.alpha)
-        return normalized_probs
+        return self.length_penalty(beam, logprobs, self.alpha)
 
 
 class PenaltyBuilder(object):
@@ -854,12 +859,12 @@ class Translator(object):
         # Structure that holds finished hypotheses.
         hypotheses = [[] for _ in range(batch_size)]  # noqa: F812
 
-        results = {}
-        results["predictions"] = [[] for _ in range(batch_size)]  # noqa: F812
-        results["scores"] = [[] for _ in range(batch_size)]  # noqa: F812
-        results["gold_score"] = [0] * batch_size
-        results["batch"] = batch
-
+        results = {
+            "predictions": [[] for _ in range(batch_size)],
+            "scores": [[] for _ in range(batch_size)],
+            "gold_score": [0] * batch_size,
+            "batch": batch,
+        }
         for step in range(max_length):
             decoder_input = alive_seq[:, -1].view(1, -1)
 

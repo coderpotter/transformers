@@ -130,7 +130,7 @@ def main():
         label_list = processor.get_labels()
         num_labels = len(label_list)
     except KeyError:
-        raise ValueError("Task not found: %s" % (data_args.task_name))
+        raise ValueError(f"Task not found: {data_args.task_name}")
 
     # Load pretrained model and tokenizer
     #
@@ -150,7 +150,7 @@ def main():
     with training_args.strategy.scope():
         model = TFAutoModelForMultipleChoice.from_pretrained(
             model_args.model_name_or_path,
-            from_pt=bool(".bin" in model_args.model_name_or_path),
+            from_pt=".bin" in model_args.model_name_or_path,
             config=config,
             cache_dir=model_args.cache_dir,
         )

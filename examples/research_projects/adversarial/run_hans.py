@@ -124,7 +124,7 @@ def main():
         training_args.local_rank,
         training_args.device,
         training_args.n_gpu,
-        bool(training_args.local_rank != -1),
+        training_args.local_rank != -1,
         training_args.fp16,
     )
     # Set the verbosity to info of the Transformers logger (on main process only):
@@ -140,7 +140,7 @@ def main():
     try:
         num_labels = hans_tasks_num_labels[data_args.task_name]
     except KeyError:
-        raise ValueError("Task not found: %s" % (data_args.task_name))
+        raise ValueError(f"Task not found: {data_args.task_name}")
 
     # Load pretrained model and tokenizer
     #
@@ -160,7 +160,7 @@ def main():
     )
     model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
+        from_tf=".ckpt" in model_args.model_name_or_path,
         config=config,
         cache_dir=model_args.cache_dir,
     )
@@ -225,7 +225,7 @@ def main():
             with open(output_eval_file, "w") as writer:
                 writer.write("pairID,gold_label\n")
                 for pid, pred in zip(pair_ids, preds):
-                    writer.write("ex" + str(pid) + "," + label_list[int(pred)] + "\n")
+                    writer.write(f"ex{str(pid)},{label_list[int(pred)]}" + "\n")
 
         trainer._log(output.metrics)
 
